@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>3D Box mit tagesaktuellem Licht</title>
+    <title>3D Box mit manueller Licht-Zeitsteuerung</title>
     <style>
         body {
             font-family: sans-serif;
@@ -13,8 +13,8 @@
             width: 200px;
             height: 200px;
             user-select: none;
-            position: absolute; /* Wichtig für das Verschieben */
-            top: 100px;
+            position: absolute;
+            top: 140px; /* Leicht nach unten verschoben wegen des neuen Feldes */
             left: 50px;
             border: 1px solid #ccc;
             background: rgba(255,255,255,0.2);
@@ -27,11 +27,19 @@
         }
         .controls {
             margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
         }
-        button {
+        button, input[type="time"] {
             padding: 6px 12px;
-            margin-right: 5px;
+            font-size: 14px;
             cursor: pointer;
+        }
+        label {
+            font-size: 14px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -40,6 +48,10 @@
 <div class="controls">
     <button id="farbe">Mach mich gelb</button>
     <button id="ziehen">Farbbox verschiebbar machen</button>
+    
+    <!-- Neues Zeiteingabefeld -->
+    <label for="zeitRegler">Sonnenstand (Uhrzeit):</label>
+    <input type="time" id="zeitRegler">
 </div>
 
 <div id="farbbox"></div>
@@ -50,6 +62,7 @@
     const farbbox = document.getElementById('farbbox');
     const ziehenButton = document.getElementById('ziehen');
     const farbeButton = document.getElementById('farbe');
+    const zeitRegler = document.getElementById('zeitRegler');
 
     // --- 3D Szene erstellen ---
     const szene = new THREE.Scene();
@@ -60,33 +73,29 @@
     renderer.setSize(200, 200);
     farbbox.appendChild(renderer.domElement);
 
-    // Würfel mit StandardMaterial (reagiert auf Licht)
     const wuerfel = new THREE.Mesh(
         new THREE.BoxGeometry(1.5, 1.5, 1.5),
         new THREE.MeshStandardMaterial({ color: 0x2be27a, roughness: 0.4, metalness: 0.1 })
     );
     szene.add(wuerfel);
 
-    // --- Dynamische Licht-Umgebung (Tageszeit) ---
+    // --- Licht-Umgebung ---
     const umgebungsLicht = new THREE.AmbientLight(0xffffff, 0.3); 
     szene.add(umgebungsLicht);
 
     const sonnenLicht = new THREE.DirectionalLight(0xffffff, 1.5);
     szene.add(sonnenLicht);
 
-    function aktualisiereTageslicht() {
-        const jetzt = new Date();
-        const stunden = jetzt.getHours() + jetzt.getMinutes() / 60; // Zeit als Dezimalzahl (z.B. 14.5)
-        
-        // Winkel der Sonne berechnen (0 = Mitternacht, 12 = Mittag, 24 = Mitternacht)
-        // Verschiebung um -Math.PI / 2, damit die Sonne mittags im Zenit steht
+    // Zentrale Funktion zur Lichtberechnung basierend auf einer Dezimal-Stunde (0.0 bis 24.0)
+    function berechneLicht(stunden) {
+        // Winkel der Sonne berechnen (Verschiebung um -Math.PI / 2 für den Zenit am Mittag)
         const winkel = (stunden / 24) * Math.PI * 2 - Math.PI / 2;
         
         // Position der Sonne auf einer Kreisbahn setzen
         const radius = 5;
         const x = Math.cos(winkel) * radius;
-        const y = Math.sin(winkel) * radius; // Positiv am Tag, negativ in der Nacht
-        const z = 3; // Leichte Neigung nach vorne für bessere Plastizität
+        const y = Math.sin(winkel) * radius; 
+        const z = 3; 
         sonnenLicht.position.set(x, y, z);
 
         // Lichtfarben und Intensitäten je nach Tageszeit anpassen
@@ -113,8 +122,28 @@
         }
     }
 
-    // Initiale Lichtberechnung
-    aktualisiereTageslicht();
+    // --- Uhrzeit initialisieren (Aktuelle Systemzeit setzen) ---
+    const jetzt = new Date();
+    const aktuelleStunden = jetzt.getHours();
+    const aktuelleMinuten = jetzt.getMinutes();
+    
+    // Formatierung für das Input-Feld (z.B. "09:05" oder "14:30")
+    const formatiert = `${String(aktuelleStunden).padStart(2, '0')}:${String(aktuelleMinuten).padStart(2, '0')}`;
+    zeitRegler.value = formatiert;
+
+    // Erstes Licht-Rendering mit der aktuellen Zeit
+    berechneLicht(aktuelleStunden + aktuelleMinuten / 60);
+
+    // --- Event Listener für das Zeiteingabefeld ---
+    zeitRegler.addEventListener('input', (e) => {
+        const zeitWert = e.target.value; // Gibt z.B. "15:45" zurück
+        if (!zeitWert) return;
+
+        const [stundenStr, minutenStr] = zeitWert.split(':');
+        const dezimalStunden = parseInt(stundenStr, 10) + parseInt(minutenStr, 10) / 60;
+        
+        berechneLicht(dezimalStunden);
+    });
 
     // --- Animationsschleife ---
     function animieren() {
