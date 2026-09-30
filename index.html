@@ -1,32 +1,57 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <style>
-    #farbbox {
-      width: 200px;
-      height: 200px;
-      user-select: none;
-    }
-
-    #farbbox canvas {
-      display: block;
-      background: none;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>3D Box mit tagesaktuellem Licht</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f0f0f0;
+            margin: 20px;
+        }
+        #farbbox {
+            width: 200px;
+            height: 200px;
+            user-select: none;
+            position: absolute; /* Wichtig für das Verschieben */
+            top: 100px;
+            left: 50px;
+            border: 1px solid #ccc;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+            cursor: default;
+        }
+        #farbbox canvas {
+            display: block;
+            background: none;
+        }
+        .controls {
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 6px 12px;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
-  <div id="farbbox"></div>
-  <button id="farbe">mach mich gelb</button>
-  <button id="ziehen">Farbbox verschiebbar machen</button>
 
-  <script type="module">
-    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js";
+<div class="controls">
+    <button id="farbe">Mach mich gelb</button>
+    <button id="ziehen">Farbbox verschiebbar machen</button>
+</div>
 
-    const farbbox = document.getElementById("farbbox");
-    const ziehenButton = document.getElementById("ziehen");
+<div id="farbbox"></div>
 
-    // 3D-Szene erstellen
+<script type="module">
+    import * as THREE from 'https://jsdelivr.net';
+
+    const farbbox = document.getElementById('farbbox');
+    const ziehenButton = document.getElementById('ziehen');
+    const farbeButton = document.getElementById('farbe');
+
+    // --- 3D Szene erstellen ---
     const szene = new THREE.Scene();
     const kamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
     kamera.position.z = 4;
@@ -35,60 +60,114 @@
     renderer.setSize(200, 200);
     farbbox.appendChild(renderer.domElement);
 
+    // Würfel mit StandardMaterial (reagiert auf Licht)
     const wuerfel = new THREE.Mesh(
-      new THREE.BoxGeometry(1.5, 1.5, 1.5),
-      new THREE.MeshStandardMaterial({ color: 0x2be27a })
+        new THREE.BoxGeometry(1.5, 1.5, 1.5),
+        new THREE.MeshStandardMaterial({ color: 0x2be27a, roughness: 0.4, metalness: 0.1 })
     );
     szene.add(wuerfel);
 
-    szene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    // --- Dynamische Licht-Umgebung (Tageszeit) ---
+    const umgebungsLicht = new THREE.AmbientLight(0xffffff, 0.3); 
+    szene.add(umgebungsLicht);
 
-    const licht = new THREE.DirectionalLight(0xffffff, 1.5);
-    licht.position.set(3, 3, 5);
-    szene.add(licht);
+    const sonnenLicht = new THREE.DirectionalLight(0xffffff, 1.5);
+    szene.add(sonnenLicht);
 
+    function aktualisiereTageslicht() {
+        const jetzt = new Date();
+        const stunden = jetzt.getHours() + jetzt.getMinutes() / 60; // Zeit als Dezimalzahl (z.B. 14.5)
+        
+        // Winkel der Sonne berechnen (0 = Mitternacht, 12 = Mittag, 24 = Mitternacht)
+        // Verschiebung um -Math.PI / 2, damit die Sonne mittags im Zenit steht
+        const winkel = (stunden / 24) * Math.PI * 2 - Math.PI / 2;
+        
+        // Position der Sonne auf einer Kreisbahn setzen
+        const radius = 5;
+        const x = Math.cos(winkel) * radius;
+        const y = Math.sin(winkel) * radius; // Positiv am Tag, negativ in der Nacht
+        const z = 3; // Leichte Neigung nach vorne für bessere Plastizität
+        sonnenLicht.position.set(x, y, z);
+
+        // Lichtfarben und Intensitäten je nach Tageszeit anpassen
+        if (stunden >= 6 && stunden < 11) {
+            // Morgen: Warmes, goldenes Licht
+            sonnenLicht.color.setHex(0xffaa44);
+            sonnenLicht.intensity = 1.8;
+            umgebungsLicht.color.setHex(0x90a0ff);
+        } else if (stunden >= 11 && stunden < 16) {
+            // Mittag: Helles, neutrales Weiß
+            sonnenLicht.color.setHex(0xffffff);
+            sonnenLicht.intensity = 2.0;
+            umgebungsLicht.color.setHex(0xffffff);
+        } else if (stunden >= 16 && stunden < 21) {
+            // Abend/Sonnenuntergang: Rötlich-Orange
+            sonnenLicht.color.setHex(0xff5522);
+            sonnenLicht.intensity = 1.5;
+            umgebungsLicht.color.setHex(0x504060);
+        } else {
+            // Nacht: Sehr schwaches, kühles Mondlicht
+            sonnenLicht.color.setHex(0x4455aa);
+            sonnenLicht.intensity = 0.3;
+            umgebungsLicht.color.setHex(0x111122);
+        }
+    }
+
+    // Initiale Lichtberechnung
+    aktualisiereTageslicht();
+
+    // --- Animationsschleife ---
     function animieren() {
-      requestAnimationFrame(animieren);
-      wuerfel.rotation.x += 0.005;
-      wuerfel.rotation.y += 0.01;
-      renderer.render(szene, kamera);
+        requestAnimationFrame(animieren);
+        wuerfel.rotation.x += 0.005;
+        wuerfel.rotation.y += 0.01;
+        renderer.render(szene, kamera);
     }
     animieren();
 
     // Würfel gelb färben
-    document.getElementById("farbe").addEventListener("click", () => {
-      wuerfel.material.color.set("yellow");
+    farbeButton.addEventListener('click', () => {
+        wuerfel.material.color.set('yellow');
     });
 
-    // Gesamte Farbbox verschiebbar machen
+    // --- Drag-and-Drop (Verschiebbar machen) ---
     let verschiebbar = false;
-    let x = 0, y = 0;
-    let startX, startY;
+    let istDragging = false;
+    let startX, startY, startLeft, startTop;
 
-    ziehenButton.addEventListener("click", () => {
-      verschiebbar = !verschiebbar;
-      ziehenButton.textContent = verschiebbar
-        ? "Verschieben ausschalten"
-        : "Farbbox verschiebbar machen";
-      farbbox.style.cursor = verschiebbar ? "grab" : "default";
-      farbbox.style.touchAction = verschiebbar ? "none" : "auto";
+    ziehenButton.addEventListener('click', () => {
+        verschiebbar = !verschiebbar;
+        if (verschiebbar) {
+            ziehenButton.textContent = "Verschieben ausschalten";
+            farbbox.style.cursor = "move";
+        } else {
+            ziehenButton.textContent = "Farbbox verschiebbar machen";
+            farbbox.style.cursor = "default";
+            istDragging = false;
+        }
     });
 
-    farbbox.addEventListener("pointerdown", (event) => {
-      if (!verschiebbar || event.button !== 0) return;
-
-      startX = event.clientX - x;
-      startY = event.clientY - y;
-      farbbox.setPointerCapture(event.pointerId);
+    farbbox.addEventListener('mousedown', (e) => {
+        if (!verschiebbar) return;
+        istDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startLeft = farbbox.offsetLeft;
+        startTop = farbbox.offsetTop;
     });
 
-    farbbox.addEventListener("pointermove", (event) => {
-      if (!verschiebbar || !farbbox.hasPointerCapture(event.pointerId)) return;
-
-      x = event.clientX - startX;
-      y = event.clientY - startY;
-      farbbox.style.transform = `translate(${x}px, ${y}px)`;
+    document.addEventListener('mousemove', (e) => {
+        if (!istDragging) return;
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        farbbox.style.left = (startLeft + deltaX) + 'px';
+        farbbox.style.top = (startTop + deltaY) + 'px';
     });
-  </script>
+
+    document.addEventListener('mouseup', () => {
+        istDragging = false;
+    });
+</script>
+
 </body>
 </html>
