@@ -1,1 +1,282 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Box mit tagesaktuellem Licht & Schuss-Modus</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f0f0f0;
+            margin: 20px;
+        }
+        #farbbox {
+            width: 200px;
+            height: 200px;
+            user-select: none;
+            position: absolute;
+            top: 140px;
+            left: 50px;
+            border: 1px solid #ccc;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 8px;
+            cursor: pointer; /* Signalisiert Interaktivität */
+        }
+        #farbbox canvas {
+            display: block;
+            background: none;
+        }
+        .controls {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button, input[type="time"] {
+            padding: 6px 12px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        label {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .info-text {
+            font-size: 12px;
+            color: #555;
+            margin-top: 5px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
 
+<div class="controls">
+    <button id="farbe">Mach mich gelb</button>
+    <button id="farbePink">Mach mich pink</button>
+    <button id="ziehen">Farbbox verschiebbar machen</button>
+    
+    <label for="zeitRegler">Sonnenstand (Uhrzeit):</label>
+    <input type="time" id="zeitRegler">
+
+    <div class="info-text">💡 <strong>Schuss-Modus:</strong> Klicke direkt auf den Würfel, um ihn anzustoßen und wild rotieren zu lassen! (Verschieben muss aus sein)</div>
+</div>
+
+<div id="farbbox">
+    <canvas id="wuerfelCanvas" width="200" height="200"></canvas>
+</div>
+
+<script>
+    const farbbox = document.getElementById('farbbox');
+    const ziehenButton = document.getElementById('ziehen');
+    const farbeButton = document.getElementById('farbe');
+    const farbePinkButton = document.getElementById('farbePink');
+    const zeitRegler = document.getElementById('zeitRegler');
+    const canvas = document.getElementById('wuerfelCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Würfelfarbe (Standard: Grün)
+    let wuerfelBasisFarbe = { r: 43, g: 226, b: 122 };
+
+    // Animations-Winkel
+    let winkelX = 0.5;
+    let winkelY = 0.5;
+
+    // Aktuelle Rotationsgeschwindigkeit (wird durch Schießen erhöht)
+    let geschwindigkeitX = 0.005;
+    let geschwindigkeitY = 0.01;
+
+    // Standard-Minimalgeschwindigkeit (Grundrotation)
+    const basisGeschwindigkeitX = 0.005;
+    const basisGeschwindigkeitY = 0.01;
+
+    // Licht-Vektor und Licht-Farbe
+    let lichtVektor = { x: 0, y: 1, z: 0 };
+    let lichtFarbe = { r: 255, g: 255, b: 255 };
+
+    // 8 Eckpunkte eines Würfels
+    const knoten = [
+        {x: -1, y: -1, z: -1}, {x: 1, y: -1, z: -1},
+        {x: 1, y: 1, z: -1},  {x: -1, y: 1, z: -1},
+        {x: -1, y: -1, z: 1},  {x: 1, y: -1, z: 1},
+        {x: 1, y: 1, z: 1},   {x: -1, y: 1, z: 1}
+    ];
+
+    // Die 6 Seitenflächen des Würfels
+    const flaechen = [
+        { punkte:, normale: {x: 0, y: 0, z: -1} }, // Hinten
+        { punkte:, normale: {x: 1, y: 0, z: 0} },  // Rechts
+        { punkte:, normale: {x: 0, y: 0, z: 1} },  // Vorne
+        { punkte:, normale: {x: -1, y: 0, z: 0} }, // Links
+        { punkte:, normale: {x: 0, y: -1, z: 0} }, // Oben
+        { punkte:, normale: {x: 0, y: 1, z: 0} }   // Unten
+    ];
+
+    // --- Lichtberechnung ---
+    function aktualisiereLicht(stunden) {
+        const sonnenWinkel = (stunden / 24) * Math.PI * 2 - Math.PI / 2;
+        
+        lichtVektor.x = Math.cos(sonnenWinkel);
+        lichtVektor.y = -Math.sin(sonnenWinkel); 
+        lichtVektor.z = 0.5;
+
+        const laenge = Math.sqrt(lichtVektor.x**2 + lichtVektor.y**2 + lichtVektor.z**2);
+        lichtVektor.x /= laenge;
+        lichtVektor.y /= laenge;
+        lichtVektor.z /= laenge;
+
+        if (stunden >= 6 && stunden < 11) {
+            lichtFarbe = { r: 255, g: 180, b: 100 }; // Morgen
+        } else if (stunden >= 11 && stunden < 16) {
+            lichtFarbe = { r: 255, g: 255, b: 255 }; // Mittag
+        } else if (stunden >= 16 && stunden < 21) {
+            lichtFarbe = { r: 255, g: 100, b: 50 };  // Abend
+        } else {
+            lichtFarbe = { r: 100, g: 120, b: 255 }; // Nacht
+        }
+    }
+
+    // --- Zeit initialisieren ---
+    const jetzt = new Date();
+    const aktuelleStunden = jetzt.getHours();
+    const aktuelleMinuten = jetzt.getMinutes();
+    zeitRegler.value = `${String(aktuelleStunden).padStart(2, '0')}:${String(aktuelleMinuten).padStart(2, '0')}`;
+    aktualisiereLicht(aktuelleStunden + aktuelleMinuten / 60);
+
+    zeitRegler.addEventListener('input', (e) => {
+        const parts = e.target.value.split(':');
+        if (parts.length === 2) {
+            aktualisiereLicht(parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60);
+        }
+    });
+
+    // Event Listener für die Farben
+    farbeButton.addEventListener('click', () => {
+        wuerfelBasisFarbe = { r: 255, g: 235, b: 59 }; // Gelb
+    });
+
+    farbePinkButton.addEventListener('click', () => {
+        wuerfelBasisFarbe = { r: 244, g: 63, b: 94 }; // Pink
+    });
+
+    // --- 3D Schuss-Interaktion ---
+    canvas.addEventListener('click', (e) => {
+        // Schießen funktioniert nur, wenn die Box nicht gerade verschoben wird
+        if (verschiebbar) return;
+
+        // Erhöhe die Rotationsgeschwindigkeit drastisch bei jedem Schuss
+        // Math.random gibt dem Schuss einen unvorhersehbaren Drall
+        geschwindigkeitX += (Math.random() - 0.5) * 0.4 + 0.2;
+        geschwindigkeitY += (Math.random() - 0.5) * 0.4 + 0.2;
+    });
+
+    // --- 3D Rotation und Rendering ---
+    function rotiereX(punkt, winkel) {
+        const rad = winkel;
+        const cos = Math.cos(rad), sin = Math.sin(rad);
+        return { x: punkt.x, y: punkt.y * cos - punkt.z * sin, z: punkt.y * sin + punkt.z * cos };
+    }
+
+    function rotiereY(punkt, winkel) {
+        const rad = winkel;
+        const cos = Math.cos(rad), sin = Math.sin(rad);
+        return { x: punkt.x * cos + punkt.z * sin, y: punkt.y, z: -punkt.x * sin + punkt.z * cos };
+    }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const rotierteKnoten = knoten.map(p => {
+            let r = rotiereX(p, winkelX);
+            return rotiereY(r, winkelY);
+        });
+
+        const gerenderteFlaechen = flaechen.map(f => {
+            let rNormale = rotiereX(f.normale, winkelX);
+            rNormale = rotiereY(rNormale, winkelY);
+
+            const zZentrum = (rotierteKnoten[f.punkte[0]].z + rotierteKnoten[f.punkte[1]].z + 
+                             rotierteKnoten[f.punkte[2]].z + rotierteKnoten[f.punkte[3]].z) / 4;
+
+            return { flaechenInfo: f, rNormale: rNormale, zZentrum: zZentrum };
+        });
+
+        gerenderteFlaechen.sort((a, b) => b.zZentrum - a.zZentrum);
+
+        gerenderteFlaechen.forEach(f => {
+            if (f.rNormale.z < 0) return;
+
+            let punktProdukt = f.rNormale.x * lichtVektor.x + f.rNormale.y * lichtVektor.y + f.rNormale.z * lichtVektor.z;
+            let lichtIntensitaet = Math.max(0.25, punktProdukt);
+
+            let r = Math.min(255, Math.floor((wuerfelBasisFarbe.r * 0.4 + lichtFarbe.r * 0.6) * lichtIntensitaet));
+            let g = Math.min(255, Math.floor((wuerfelBasisFarbe.g * 0.4 + lichtFarbe.g * 0.6) * lichtIntensitaet));
+            let b = Math.min(255, Math.floor((wuerfelBasisFarbe.b * 0.4 + lichtFarbe.b * 0.6) * lichtIntensitaet));
+
+            ctx.beginPath();
+            f.flaechenInfo.punkte.forEach((kIdx, i) => {
+                const k = rotierteKnoten[kIdx];
+                const x2d = canvas.width / 2 + k.x * 55;
+                const y2d = canvas.height / 2 + k.y * 55;
+
+                if (i === 0) ctx.moveTo(x2d, y2d);
+                else ctx.lineTo(x2d, y2d);
+            });
+            ctx.closePath();
+
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            ctx.fill();
+            ctx.strokeStyle = `rgba(0,0,0,0.15)`;
+            ctx.stroke();
+        });
+
+        // Winkel verändern
+        winkelX += geschwindigkeitX;
+        winkelY += geschwindigkeitY;
+
+        // Reibungs-Effekt: Verringert die Geschwindigkeit nach einem Schuss kontinuierlich
+        // bremst bis zur Basis-Geschwindigkeit ab
+        if (Math.abs(geschwindigkeitX) > basisGeschwindigkeitX) {
+            geschwindigkeitX *= 0.98; // Verliert 2% Speed pro Frame
+        }
+        if (Math.abs(geschwindigkeitY) > basisGeschwindigkeitY) {
+            geschwindigkeitY *= 0.98;
+        }
+
+        requestAnimationFrame(render);
+    }
+
+    render();
+
+    // --- Drag-and-Drop Logik ---
+    let verschiebbar = false;
+    let istDragging = false;
+    let startX, startY, startLeft, startTop;
+
+    ziehenButton.addEventListener('click', () => {
+        verschiebbar = !verschiebbar;
+        if (verschiebbar) {
+            ziehenButton.textContent = "Verschieben ausschalten";
+            farbbox.style.cursor = "move";
+        } else {
+            ziehenButton.textContent = "Farbbox verschiebbar machen";
+            farbbox.style.cursor = "pointer"; // Cursor wechselt zurück zum "Klick"-Zeiger
+            istDragging = false;
+        }
+    });
+
+    farbbox.addEventListener('mousedown', (e) => {
+        if (!verschiebbar) return;
+        istDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startLeft = farbbox.offsetLeft;
+        startTop = farbbox.offsetTop;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!istDragging) return;
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        farbbox.style.left = (startLeft + deltaX) + 'px';
+        farbbox.style.top = (startTop + deltaY) + 'px';
