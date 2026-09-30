@@ -2,135 +2,120 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Three.js 3D Farbbox</title>
+    <title>Three.js 3D Farbbox Drag</title>
     <style>
-        /* Der Container behält deine Originalgröße */
         #farbbox {
             width: 200px;
             height: 200px;
-            margin-bottom: 10px;
+            background-color: #2be27a; /* Fallback */
+            position: absolute; /* Wichtig für das Verschieben */
+            left: 50px;
+            top: 50px;
             cursor: default;
             touch-action: auto;
+        }
+        .controls {
+            position: absolute;
+            top: 280px;
+            left: 50px;
         }
         button {
             margin-right: 5px;
             padding: 8px 12px;
         }
     </style>
-    <!-- Three.js über CDN einbinden -->
+    <!-- Three.js CDN -->
     <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
-    <!-- Hier wird die 3D-Szene hineingerendert -->
     <div id="farbbox"></div>
 
-    <button id="farbe">mach mich gelb</button>
-    <button id="ziehen">3D-Drehung aktivieren</button>
+    <div class="controls">
+        <button id="farbe">mach mich gelb</button>
+        <button id="ziehen">Farbbox verschiebbar machen</button>
+    </div>
 
     <script>
-        const boxContainer = document.getElementById('farbbox');
+        const box = document.getElementById('farbbox');
         const farbeButton = document.getElementById('farbe');
         const ziehenButton = document.getElementById('ziehen');
 
-        let verschiebbar = false;
-
-        // --- THREE.JS SETUP ---
+        // --- THREE.JS INITIALISIERUNG ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x2be27a); // Deine Startfarbe
+        scene.background = new THREE.Color(0x2be27a); // Startfarbe Grün
 
-        // Kamera
-        const camera = new THREE.PerspectiveCamera(45, 200 / 200, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
         camera.position.z = 3;
 
-        // Renderer
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(200, 200);
-        boxContainer.appendChild(renderer.domElement);
+        box.appendChild(renderer.domElement);
 
-        // 3D-Objekt (Würfel)
+        // Würfel erstellen
         const geometry = new THREE.BoxGeometry(1, 1, 1);
-        // MeshStandardMaterial reagiert auf Licht
-        const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }); 
+        const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
         const cube = new THREE.Mesh(geometry, material);
         scene.add(cube);
 
-        // Licht hinzufügen, damit man die 3D-Kanten sieht
+        // Licht für 3D-Effekt
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(2, 4, 3);
+        scene.add(dirLight);
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(2, 4, 3);
-        scene.add(directionalLight);
-
-        // Animationsschleife (rendert die Szene durchgehend)
+        // Automatische Dauerschleife für die Würfel-Rotation
         function animate() {
             requestAnimationFrame(animate);
-            
-            // Eine leichte automatische Drehung, wenn nicht aktiv gedreht wird
-            if (!verschiebbar) {
-                cube.rotation.x += 0.005;
-                cube.rotation.y += 0.005;
-            }
-            
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.015;
             renderer.render(scene, camera);
         }
         animate();
 
+        // --- DEINE ORIGINAL-INTERAKTIONSLOGIK ---
+        let verschiebbar = false;
+        let x = 0, y = 0;
+        let startX, startY;
 
-        // --- INTERAKTIONEN ---
-
-        // 1. Farbe ändern (ändert den Hintergrund der 3D-Szene)
+        // Farbe ändern
         farbeButton.addEventListener('click', () => {
-            scene.background.set(0xff0000); // Setzt den Hintergrund auf Gelb
-            // Optional: Wenn du den Würfel selbst gelb machen willst, nutze: cube.material.color.set(0xffff00);
+            scene.background.set(0xffff00); // Setzt das 3D-Canvas auf Gelb
         });
 
-        // 2. Modus umschalten
+        // Drag-Modus aktivieren/deaktivieren
         ziehenButton.addEventListener('click', () => {
             verschiebbar = !verschiebbar;
             if (verschiebbar) {
                 ziehenButton.textContent = 'Verschieben ausschalten';
-                boxContainer.style.cursor = 'grab';
-                boxContainer.style.touchAction = 'none';
+                box.style.cursor = 'grab';
+                box.style.touchAction = 'none';
             } else {
-                ziehenButton.textContent = '3D-Drehung aktivieren';
-                boxContainer.style.cursor = 'default';
-                boxContainer.style.touchAction = 'auto';
+                ziehenButton.textContent = 'Farbbox verschiebbar machen';
+                box.style.cursor = 'default';
+                box.style.touchAction = 'auto';
             }
         });
 
-        // 3. Pointer-Events für die 3D-Drehung
-        let isDragging = false;
-        let previousPointerPosition = { x: 0, y: 0 };
-
-        boxContainer.addEventListener('pointerdown', (event) => {
+        // Zieh-Logik per PointerEvents (verschiebt das komplette HTML-Element)
+        box.addEventListener('pointerdown', (event) => {
             if (!verschiebbar) return;
-            isDragging = true;
-            previousPointerPosition = { x: event.clientX, y: event.clientY };
-            boxContainer.setPointerCapture(event.pointerId);
-            boxContainer.style.cursor = 'grabbing';
+            startX = event.clientX - x;
+            startY = event.clientY - y;
+            box.setPointerCapture(event.pointerId);
+            box.style.cursor = 'grabbing';
         });
 
-        boxContainer.addEventListener('pointermove', (event) => {
-            if (!verschiebbar || !isDragging || !boxContainer.hasPointerCapture(event.pointerId)) return;
-
-            // Berechne, wie weit die Maus bewegt wurde
-            const deltaMove = {
-                x: event.clientX - previousPointerPosition.x,
-                y: event.clientY - previousPointerPosition.y
-            };
-
-            // Drehe den 3D-Würfel basierend auf der Mausbewegung
-            cube.rotation.y += deltaMove.x * 0.01;
-            cube.rotation.x += deltaMove.y * 0.01;
-
-            previousPointerPosition = { x: event.clientX, y: event.clientY };
+        box.addEventListener('pointermove', (event) => {
+            if (!verschiebbar || !box.hasPointerCapture(event.pointerId)) return;
+            x = event.clientX - startX;
+            y = event.clientY - startY;
+            box.style.transform = `translate(${x}px, ${y}px)`;
         });
 
-        boxContainer.addEventListener('pointerup', (event) => {
-            isDragging = false;
-            if (verschiebbar) boxContainer.style.cursor = 'grab';
+        box.addEventListener('pointerup', (event) => {
+            if (verschiebbar) box.style.cursor = 'grab';
         });
     </script>
 </body>
