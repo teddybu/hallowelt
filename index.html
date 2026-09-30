@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>3D Box mit manueller Licht-Zeitsteuerung</title>
+    <title>3D Box mit optimiertem Licht & aktueller Zeit</title>
     <style>
         body {
             font-family: sans-serif;
@@ -14,10 +14,10 @@
             height: 200px;
             user-select: none;
             position: absolute;
-            top: 140px; /* Leicht nach unten verschoben wegen des neuen Feldes */
+            top: 140px;
             left: 50px;
             border: 1px solid #ccc;
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.4); /* Etwas deckender für besseren Kontrast */
             border-radius: 8px;
             cursor: default;
         }
@@ -49,7 +49,6 @@
     <button id="farbe">Mach mich gelb</button>
     <button id="ziehen">Farbbox verschiebbar machen</button>
     
-    <!-- Neues Zeiteingabefeld -->
     <label for="zeitRegler">Sonnenstand (Uhrzeit):</label>
     <input type="time" id="zeitRegler">
 </div>
@@ -80,63 +79,66 @@
     szene.add(wuerfel);
 
     // --- Licht-Umgebung ---
-    const umgebungsLicht = new THREE.AmbientLight(0xffffff, 0.3); 
+    // Ein Grundrauschen an Licht, damit der Würfel niemals komplett schwarz wird
+    const umgebungsLicht = new THREE.AmbientLight(0xffffff, 0.6); 
     szene.add(umgebungsLicht);
 
     const sonnenLicht = new THREE.DirectionalLight(0xffffff, 1.5);
     szene.add(sonnenLicht);
 
-    // Zentrale Funktion zur Lichtberechnung basierend auf einer Dezimal-Stunde (0.0 bis 24.0)
+    // Funktion zur Berechnung des Lichtes
     function berechneLicht(stunden) {
-        // Winkel der Sonne berechnen (Verschiebung um -Math.PI / 2 für den Zenit am Mittag)
+        // Sonnenbahn berechnen
         const winkel = (stunden / 24) * Math.PI * 2 - Math.PI / 2;
-        
-        // Position der Sonne auf einer Kreisbahn setzen
         const radius = 5;
         const x = Math.cos(winkel) * radius;
         const y = Math.sin(winkel) * radius; 
-        const z = 3; 
+        const z = 4; // Z leicht erhöht, damit das Licht plastischer von vorne kommt
         sonnenLicht.position.set(x, y, z);
 
-        // Lichtfarben und Intensitäten je nach Tageszeit anpassen
+        // Helligkeiten und Farben für optimale Sichtbarkeit angepasst
         if (stunden >= 6 && stunden < 11) {
-            // Morgen: Warmes, goldenes Licht
-            sonnenLicht.color.setHex(0xffaa44);
-            sonnenLicht.intensity = 1.8;
-            umgebungsLicht.color.setHex(0x90a0ff);
+            // Morgen
+            sonnenLicht.color.setHex(0xffb566);
+            sonnenLicht.intensity = 1.6;
+            umgebungsLicht.color.setHex(0xa0b0ff);
+            umgebungsLicht.intensity = 0.6;
         } else if (stunden >= 11 && stunden < 16) {
-            // Mittag: Helles, neutrales Weiß
+            // Mittag
             sonnenLicht.color.setHex(0xffffff);
             sonnenLicht.intensity = 2.0;
             umgebungsLicht.color.setHex(0xffffff);
+            umgebungsLicht.intensity = 0.7;
         } else if (stunden >= 16 && stunden < 21) {
-            // Abend/Sonnenuntergang: Rötlich-Orange
-            sonnenLicht.color.setHex(0xff5522);
+            // Abend
+            sonnenLicht.color.setHex(0xff6633);
             sonnenLicht.intensity = 1.5;
-            umgebungsLicht.color.setHex(0x504060);
+            umgebungsLicht.color.setHex(0x706080);
+            umgebungsLicht.intensity = 0.6;
         } else {
-            // Nacht: Sehr schwaches, kühles Mondlicht
-            sonnenLicht.color.setHex(0x4455aa);
-            sonnenLicht.intensity = 0.3;
-            umgebungsLicht.color.setHex(0x111122);
+            // Nacht (Optimiert: Jetzt bleibt der Würfel bläulich sichtbar)
+            sonnenLicht.color.setHex(0x5577ff);
+            sonnenLicht.intensity = 0.6; 
+            umgebungsLicht.color.setHex(0x223366);
+            umgebungsLicht.intensity = 0.5;
         }
     }
 
-    // --- Uhrzeit initialisieren (Aktuelle Systemzeit setzen) ---
+    // --- Aktuelle Systemzeit auslesen und setzen ---
     const jetzt = new Date();
     const aktuelleStunden = jetzt.getHours();
     const aktuelleMinuten = jetzt.getMinutes();
     
-    // Formatierung für das Input-Feld (z.B. "09:05" oder "14:30")
+    // Setzt das Eingabefeld exakt auf die aktuelle Uhrzeit
     const formatiert = `${String(aktuelleStunden).padStart(2, '0')}:${String(aktuelleMinuten).padStart(2, '0')}`;
     zeitRegler.value = formatiert;
 
-    // Erstes Licht-Rendering mit der aktuellen Zeit
+    // Führt die Lichtberechnung sofort für DIESE Uhrzeit aus
     berechneLicht(aktuelleStunden + aktuelleMinuten / 60);
 
-    // --- Event Listener für das Zeiteingabefeld ---
+    // Event Listener bei manueller Änderung
     zeitRegler.addEventListener('input', (e) => {
-        const zeitWert = e.target.value; // Gibt z.B. "15:45" zurück
+        const zeitWert = e.target.value;
         if (!zeitWert) return;
 
         const [stundenStr, minutenStr] = zeitWert.split(':');
@@ -159,7 +161,7 @@
         wuerfel.material.color.set('yellow');
     });
 
-    // --- Drag-and-Drop (Verschiebbar machen) ---
+    // --- Drag-and-Drop ---
     let verschiebbar = false;
     let istDragging = false;
     let startX, startY, startLeft, startTop;
