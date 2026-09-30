@@ -47,7 +47,6 @@
 
 <div class="controls">
     <button id="farbe">Mach mich gelb</button>
-    <!-- Neuer Button für Pink -->
     <button id="farbePink">Mach mich pink</button>
     <button id="ziehen">Farbbox verschiebbar machen</button>
     
@@ -63,7 +62,7 @@
     const farbbox = document.getElementById('farbbox');
     const ziehenButton = document.getElementById('ziehen');
     const farbeButton = document.getElementById('farbe');
-    const farbePinkButton = document.getElementById('farbePink'); // Referenz auf neuen Button
+    const farbePinkButton = document.getElementById('farbePink');
     const zeitRegler = document.getElementById('zeitRegler');
     const canvas = document.getElementById('wuerfelCanvas');
     const ctx = canvas.getContext('2d');
@@ -79,7 +78,7 @@
     let lichtVektor = { x: 0, y: 1, z: 0 };
     let lichtFarbe = { r: 255, g: 255, b: 255 };
 
-    // 8 Eckpunkte eines Würfels (Modell-Koordinaten)
+    // 8 Eckpunkte eines Würfels
     const knoten = [
         {x: -1, y: -1, z: -1}, {x: 1, y: -1, z: -1},
         {x: 1, y: 1, z: -1},  {x: -1, y: 1, z: -1},
@@ -87,14 +86,14 @@
         {x: 1, y: 1, z: 1},   {x: -1, y: 1, z: 1}
     ];
 
-    // Die 6 Seitenflächen definiert durch die Eckpunkt-Indizes und deren Normalenvektoren
+    // Korrigierte Flächenzuweisung (Klammern sind jetzt befüllt)
     const flaechen = [
-        { punkte:, normale: {x: 0, y: 0, z: -1} }, // Hinten
-        { punkte:, normale: {x: 1, y: 0, z: 0} },  // Rechts
-        { punkte:, normale: {x: 0, y: 0, z: 1} },  // Vorne
-        { punkte:, normale: {x: -1, y: 0, z: 0} }, // Links
-        { punkte:, normale: {x: 0, y: -1, z: 0} }, // Oben
-        { punkte:, normale: {x: 0, y: 1, z: 0} }   // Unten
+        { punkte: [0, 1, 2, 3], normale: {x: 0, y: 0, z: -1} }, // Hinten
+        { punkte: [1, 5, 6, 2], normale: {x: 1, y: 0, z: 0} },  // Rechts
+        { punkte: [4, 7, 6, 5], normale: {x: 0, y: 0, z: 1} },  // Vorne
+        { punkte: [0, 3, 7, 4], normale: {x: -1, y: 0, z: 0} }, // Links
+        { punkte: [0, 4, 5, 1], normale: {x: 0, y: -1, z: 0} }, // Oben
+        { punkte: [3, 2, 6, 7], normale: {x: 0, y: 1, z: 0} }   // Unten
     ];
 
     // --- Lichtberechnung ---
@@ -131,18 +130,17 @@
     zeitRegler.addEventListener('input', (e) => {
         const parts = e.target.value.split(':');
         if (parts.length === 2) {
-            aktualisiereLicht(parseInt(parts, 10) + parseInt(parts, 10) / 60);
+            aktualisiereLicht(parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60);
         }
     });
 
-    // Event Listener für Gelb
+    // Event Listener für die Farben
     farbeButton.addEventListener('click', () => {
-        wuerfelBasisFarbe = { r: 255, g: 235, b: 59 }; 
+        wuerfelBasisFarbe = { r: 255, g: 235, b: 59 }; // Gelb
     });
 
-    // Event Listener für Pink (Neu)
     farbePinkButton.addEventListener('click', () => {
-        wuerfelBasisFarbe = { r: 244, g: 63, b: 94 }; // RGB-Werte für ein kräftiges Pink
+        wuerfelBasisFarbe = { r: 244, g: 63, b: 94 }; // Pink
     });
 
     // --- 3D Rotation und Rendering ---
@@ -170,8 +168,8 @@
             let rNormale = rotiereX(f.normale, winkelX);
             rNormale = rotiereY(rNormale, winkelY);
 
-            const zZentrum = (rotierteKnoten[f.punkte].z + rotierteKnoten[f.punkte].z + 
-                             rotierteKnoten[f.punkte].z + rotierteKnoten[f.punkte].z) / 4;
+            const zZentrum = (rotierteKnoten[f.punkte[0]].z + rotierteKnoten[f.punkte[1]].z + 
+                             rotierteKnoten[f.punkte[2]].z + rotierteKnoten[f.punkte[3]].z) / 4;
 
             return { flaechenInfo: f, rNormale: rNormale, zZentrum: zZentrum };
         });
@@ -182,7 +180,7 @@
             if (f.rNormale.z < 0) return;
 
             let punktProdukt = f.rNormale.x * lichtVektor.x + f.rNormale.y * lichtVektor.y + f.rNormale.z * lichtVektor.z;
-            let lichtIntensitaet = Math.max(0.2, punktProdukt);
+            let lichtIntensitaet = Math.max(0.25, punktProdukt);
 
             let r = Math.min(255, Math.floor((wuerfelBasisFarbe.r * 0.4 + lichtFarbe.r * 0.6) * lichtIntensitaet));
             let g = Math.min(255, Math.floor((wuerfelBasisFarbe.g * 0.4 + lichtFarbe.g * 0.6) * lichtIntensitaet));
