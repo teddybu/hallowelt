@@ -102,14 +102,14 @@
         {x: 1, y: 1, z: 1},   {x: -1, y: 1, z: 1}
     ];
 
-    // Die 6 Seitenflächen des Würfels
+    // Die 6 Seitenflächen des Würfels mit korrekten Indizes (Hier lag vorher der Fehler)
     const flaechen = [
-        { punkte:, normale: {x: 0, y: 0, z: -1} }, // Hinten
-        { punkte:, normale: {x: 1, y: 0, z: 0} },  // Rechts
-        { punkte:, normale: {x: 0, y: 0, z: 1} },  // Vorne
-        { punkte:, normale: {x: -1, y: 0, z: 0} }, // Links
-        { punkte:, normale: {x: 0, y: -1, z: 0} }, // Oben
-        { punkte:, normale: {x: 0, y: 1, z: 0} }   // Unten
+        { punkte: [0, 1, 2, 3], normale: {x: 0, y: 0, z: -1} }, // Hinten
+        { punkte: [1, 5, 6, 2], normale: {x: 1, y: 0, z: 0} },  // Rechts
+        { punkte: [5, 4, 7, 6], normale: {x: 0, y: 0, z: 1} },  // Vorne
+        { punkte: [4, 0, 3, 7], normale: {x: -1, y: 0, z: 0} }, // Links
+        { punkte: [4, 5, 1, 0], normale: {x: 0, y: -1, z: 0} }, // Oben
+        { punkte: [3, 2, 6, 7], normale: {x: 0, y: 1, z: 0} }   // Unten
     ];
 
     // --- Lichtberechnung ---
