@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>3D Box mit tagesaktuellem Licht (Garantierte Offline-Version)</title>
+    <title>3D Box mit tagesaktuellem Licht & Pink-Button</title>
     <style>
         body {
             font-family: sans-serif;
@@ -47,6 +47,8 @@
 
 <div class="controls">
     <button id="farbe">Mach mich gelb</button>
+    <!-- Neuer Button für Pink -->
+    <button id="farbePink">Mach mich pink</button>
     <button id="ziehen">Farbbox verschiebbar machen</button>
     
     <label for="zeitRegler">Sonnenstand (Uhrzeit):</label>
@@ -58,10 +60,10 @@
 </div>
 
 <script>
-    // --- KEINE VERWENDUNG VON "THREE" MEHR ---
     const farbbox = document.getElementById('farbbox');
     const ziehenButton = document.getElementById('ziehen');
     const farbeButton = document.getElementById('farbe');
+    const farbePinkButton = document.getElementById('farbePink'); // Referenz auf neuen Button
     const zeitRegler = document.getElementById('zeitRegler');
     const canvas = document.getElementById('wuerfelCanvas');
     const ctx = canvas.getContext('2d');
@@ -97,21 +99,17 @@
 
     // --- Lichtberechnung ---
     function aktualisiereLicht(stunden) {
-        // Sonnenposition berechnen (0-24 Uhr = 360 Grad im Kreis)
         const sonnenWinkel = (stunden / 24) * Math.PI * 2 - Math.PI / 2;
         
-        // Richtung, aus der das Licht kommt
         lichtVektor.x = Math.cos(sonnenWinkel);
         lichtVektor.y = -Math.sin(sonnenWinkel); 
-        lichtVektor.z = 0.5; // Plastischer Vorne-Effekt
+        lichtVektor.z = 0.5;
 
-        // Vektor normalisieren
         const laenge = Math.sqrt(lichtVektor.x**2 + lichtVektor.y**2 + lichtVektor.z**2);
         lichtVektor.x /= laenge;
         lichtVektor.y /= laenge;
         lichtVektor.z /= laenge;
 
-        // Farben je nach Tageszeit anpassen
         if (stunden >= 6 && stunden < 11) {
             lichtFarbe = { r: 255, g: 180, b: 100 }; // Morgen
         } else if (stunden >= 11 && stunden < 16) {
@@ -133,12 +131,18 @@
     zeitRegler.addEventListener('input', (e) => {
         const parts = e.target.value.split(':');
         if (parts.length === 2) {
-            aktualisiereLicht(parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60);
+            aktualisiereLicht(parseInt(parts, 10) + parseInt(parts, 10) / 60);
         }
     });
 
+    // Event Listener für Gelb
     farbeButton.addEventListener('click', () => {
-        wuerfelBasisFarbe = { r: 255, g: 235, b: 59 }; // Gelb
+        wuerfelBasisFarbe = { r: 255, g: 235, b: 59 }; 
+    });
+
+    // Event Listener für Pink (Neu)
+    farbePinkButton.addEventListener('click', () => {
+        wuerfelBasisFarbe = { r: 244, g: 63, b: 94 }; // RGB-Werte für ein kräftiges Pink
     });
 
     // --- 3D Rotation und Rendering ---
@@ -157,35 +161,29 @@
     function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 1. Alle Punkte rotieren
         const rotierteKnoten = knoten.map(p => {
             let r = rotiereX(p, winkelX);
             return rotiereY(r, winkelY);
         });
 
-        // 2. Flächen berechnen und Tiefensortierung (Painters Algorithm) vornehmen
         const gerenderteFlaechen = flaechen.map(f => {
             let rNormale = rotiereX(f.normale, winkelX);
             rNormale = rotiereY(rNormale, winkelY);
 
-            const zZentrum = (rotierteKnoten[f.punkte[0]].z + rotierteKnoten[f.punkte[1]].z + 
-                             rotierteKnoten[f.punkte[2]].z + rotierteKnoten[f.punkte[3]].z) / 4;
+            const zZentrum = (rotierteKnoten[f.punkte].z + rotierteKnoten[f.punkte].z + 
+                             rotierteKnoten[f.punkte].z + rotierteKnoten[f.punkte].z) / 4;
 
             return { flaechenInfo: f, rNormale: rNormale, zZentrum: zZentrum };
         });
 
-        // Sortieren, damit die hinteren Flächen zuerst gezeichnet werden
         gerenderteFlaechen.sort((a, b) => b.zZentrum - a.zZentrum);
 
-        // 3. Flächen zeichnen
         gerenderteFlaechen.forEach(f => {
             if (f.rNormale.z < 0) return;
 
-            // Diffuses Licht berechnen
             let punktProdukt = f.rNormale.x * lichtVektor.x + f.rNormale.y * lichtVektor.y + f.rNormale.z * lichtVektor.z;
-            let lichtIntensitaet = Math.max(0.2, punktProdukt); // Mindest-Grundhelligkeit angehoben
+            let lichtIntensitaet = Math.max(0.2, punktProdukt);
 
-            // Mischen der Würfelfarbe mit der Lichtfarbe und Intensität
             let r = Math.min(255, Math.floor((wuerfelBasisFarbe.r * 0.4 + lichtFarbe.r * 0.6) * lichtIntensitaet));
             let g = Math.min(255, Math.floor((wuerfelBasisFarbe.g * 0.4 + lichtFarbe.g * 0.6) * lichtIntensitaet));
             let b = Math.min(255, Math.floor((wuerfelBasisFarbe.b * 0.4 + lichtFarbe.b * 0.6) * lichtIntensitaet));
@@ -207,14 +205,12 @@
             ctx.stroke();
         });
 
-        // Kontinuierliche Drehung
         winkelX += 0.005;
         winkelY += 0.01;
 
         requestAnimationFrame(render);
     }
 
-    // Starten
     render();
 
     // --- Drag-and-Drop Logik ---
