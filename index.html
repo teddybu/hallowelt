@@ -3,10 +3,11 @@
 <body>
     <p>Hallo Welt</p>
     <div id="farbbox" style="width: 200px; height: 200px; background-color: #2be27a;"></div> 
-    <button id="farbe">mach mich gelb</button>
-    <button id="ziehen">Farbbox verschiebbar machen</button>
+<div id="farbbox" style="width: 200px; height: 200px; background-color: #2be27a;"></div>
+<button id="farbe">mach mich gelb</button>
+<button id="ziehen">Farbbox verschiebbar machen</button>
 
-    <script>
+<script>
   const box = document.getElementById("farbbox");
   const ziehenButton = document.getElementById("ziehen");
 
@@ -42,7 +43,6 @@
     y = event.clientY - startY;
     box.style.transform = `translate(${x}px, ${y}px)`;
   });
-        
 </script>
     
 </body>
