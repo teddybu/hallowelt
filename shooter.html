@@ -19,7 +19,7 @@
             border: 1px solid #ccc;
             background: rgba(255, 255, 255, 0.6);
             border-radius: 8px;
-            cursor: pointer; /* Signalisiert Interaktivität */
+            cursor: pointer;
         }
         #farbbox canvas {
             display: block;
@@ -161,11 +161,9 @@
 
     // --- 3D Schuss-Interaktion ---
     canvas.addEventListener('click', (e) => {
-        // Schießen funktioniert nur, wenn die Box nicht gerade verschoben wird
         if (verschiebbar) return;
 
-        // Erhöhe die Rotationsgeschwindigkeit drastisch bei jedem Schuss
-        // Math.random gibt dem Schuss einen unvorhersehbaren Drall
+        // Erhöht die Rotationsgeschwindigkeit drastisch bei jedem Schuss
         geschwindigkeitX += (Math.random() - 0.5) * 0.4 + 0.2;
         geschwindigkeitY += (Math.random() - 0.5) * 0.4 + 0.2;
     });
@@ -234,10 +232,9 @@
         winkelX += geschwindigkeitX;
         winkelY += geschwindigkeitY;
 
-        // Reibungs-Effekt: Verringert die Geschwindigkeit nach einem Schuss kontinuierlich
-        // bremst bis zur Basis-Geschwindigkeit ab
+        // Reibungs-Effekt
         if (Math.abs(geschwindigkeitX) > basisGeschwindigkeitX) {
-            geschwindigkeitX *= 0.98; // Verliert 2% Speed pro Frame
+            geschwindigkeitX *= 0.98;
         }
         if (Math.abs(geschwindigkeitY) > basisGeschwindigkeitY) {
             geschwindigkeitY *= 0.98;
@@ -260,7 +257,7 @@
             farbbox.style.cursor = "move";
         } else {
             ziehenButton.textContent = "Farbbox verschiebbar machen";
-            farbbox.style.cursor = "pointer"; // Cursor wechselt zurück zum "Klick"-Zeiger
+            farbbox.style.cursor = "pointer";
             istDragging = false;
         }
     });
@@ -280,3 +277,12 @@
         const deltaY = e.clientY - startY;
         farbbox.style.left = (startLeft + deltaX) + 'px';
         farbbox.style.top = (startTop + deltaY) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+        istDragging = false;
+    });
+</script>
+
+</body>
+</html>
