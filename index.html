@@ -2,7 +2,14 @@
 <html>
 <body>
     <p>Hallo Welt</p>
-    <div style="width: 200px; height: 200px; background-color: #2be27a;"></div>
+    <div id="farbbox" style="width: 200px; height: 200px; background-color: #2be27a;"></div> 
+    <button id="farbe">mach mich gelb</button>
+
+    <script>
+  document.getElementById("farbe").addEventListener("click", function () {
+    document.getElementById("farbbox").style.backgroundColor = "yellow";
+  });
+</script>
     
 </body>
 </html>
