@@ -17,7 +17,7 @@
             top: 140px;
             left: 50px;
             border: 1px solid #ccc;
-            background: rgba(255, 255, 255, 0.4); /* Etwas deckender für besseren Kontrast */
+            background: rgba(255, 255, 255, 0.4);
             border-radius: 8px;
             cursor: default;
         }
@@ -42,6 +42,8 @@
             font-weight: bold;
         }
     </style>
+    <!-- Klassische Three.js Einbindung (Verhindert das unendliche Laden bei lokalem file:// Aufruf) -->
+    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
@@ -55,9 +57,8 @@
 
 <div id="farbbox"></div>
 
-<script type="module">
-    import * as THREE from 'https://jsdelivr.net';
-
+<script>
+    // Zugriff erfolgt nun über das globale THREE-Objekt, da kein Modul-Import mehr nötig ist
     const farbbox = document.getElementById('farbbox');
     const ziehenButton = document.getElementById('ziehen');
     const farbeButton = document.getElementById('farbe');
@@ -79,7 +80,6 @@
     szene.add(wuerfel);
 
     // --- Licht-Umgebung ---
-    // Ein Grundrauschen an Licht, damit der Würfel niemals komplett schwarz wird
     const umgebungsLicht = new THREE.AmbientLight(0xffffff, 0.6); 
     szene.add(umgebungsLicht);
 
@@ -88,15 +88,13 @@
 
     // Funktion zur Berechnung des Lichtes
     function berechneLicht(stunden) {
-        // Sonnenbahn berechnen
         const winkel = (stunden / 24) * Math.PI * 2 - Math.PI / 2;
         const radius = 5;
         const x = Math.cos(winkel) * radius;
         const y = Math.sin(winkel) * radius; 
-        const z = 4; // Z leicht erhöht, damit das Licht plastischer von vorne kommt
+        const z = 4; 
         sonnenLicht.position.set(x, y, z);
 
-        // Helligkeiten und Farben für optimale Sichtbarkeit angepasst
         if (stunden >= 6 && stunden < 11) {
             // Morgen
             sonnenLicht.color.setHex(0xffb566);
@@ -116,7 +114,7 @@
             umgebungsLicht.color.setHex(0x706080);
             umgebungsLicht.intensity = 0.6;
         } else {
-            // Nacht (Optimiert: Jetzt bleibt der Würfel bläulich sichtbar)
+            // Nacht
             sonnenLicht.color.setHex(0x5577ff);
             sonnenLicht.intensity = 0.6; 
             umgebungsLicht.color.setHex(0x223366);
@@ -129,11 +127,11 @@
     const aktuelleStunden = jetzt.getHours();
     const aktuelleMinuten = jetzt.getMinutes();
     
-    // Setzt das Eingabefeld exakt auf die aktuelle Uhrzeit
+    // Setzt das Eingabefeld auf die aktuelle Uhrzeit
     const formatiert = `${String(aktuelleStunden).padStart(2, '0')}:${String(aktuelleMinuten).padStart(2, '0')}`;
     zeitRegler.value = formatiert;
 
-    // Führt die Lichtberechnung sofort für DIESE Uhrzeit aus
+    // Führt die Lichtberechnung sofort aus
     berechneLicht(aktuelleStunden + aktuelleMinuten / 60);
 
     // Event Listener bei manueller Änderung
