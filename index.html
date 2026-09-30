@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>3D Box mit optimiertem Licht & aktueller Zeit</title>
+    <title>3D Box mit tagesaktuellem Licht (Pure Offline)</title>
     <style>
         body {
             font-family: sans-serif;
@@ -17,7 +17,7 @@
             top: 140px;
             left: 50px;
             border: 1px solid #ccc;
-            background: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.6);
             border-radius: 8px;
             cursor: default;
         }
@@ -42,8 +42,6 @@
             font-weight: bold;
         }
     </style>
-    <!-- Klassische Three.js Einbindung (Verhindert das unendliche Laden bei lokalem file:// Aufruf) -->
-    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
@@ -55,111 +53,174 @@
     <input type="time" id="zeitRegler">
 </div>
 
-<div id="farbbox"></div>
+<div id="farbbox">
+    <canvas id="wuerfelCanvas" width="200" height="200"></canvas>
+</div>
 
 <script>
-    // Zugriff erfolgt nun über das globale THREE-Objekt, da kein Modul-Import mehr nötig ist
     const farbbox = document.getElementById('farbbox');
     const ziehenButton = document.getElementById('ziehen');
     const farbeButton = document.getElementById('farbe');
     const zeitRegler = document.getElementById('zeitRegler');
+    const canvas = document.getElementById('wuerfelCanvas');
+    const ctx = canvas.getContext('2d');
 
-    // --- 3D Szene erstellen ---
-    const szene = new THREE.Scene();
-    const kamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-    kamera.position.z = 4;
+    // Würfelfarbe (Standard: Grün)
+    let wuerfelBasisFarbe = { r: 43, g: 226, b: 122 };
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(200, 200);
-    farbbox.appendChild(renderer.domElement);
+    // Animations-Winkel
+    let winkelX = 0.5;
+    let winkelY = 0.5;
 
-    const wuerfel = new THREE.Mesh(
-        new THREE.BoxGeometry(1.5, 1.5, 1.5),
-        new THREE.MeshStandardMaterial({ color: 0x2be27a, roughness: 0.4, metalness: 0.1 })
-    );
-    szene.add(wuerfel);
+    // Licht-Vektor (Standardmäßig initialisiert)
+    let lichtVektor = { x: 0, y: 1, z: 0 };
+    let lichtFarbe = { r: 255, g: 255, b: 255 };
 
-    // --- Licht-Umgebung ---
-    const umgebungsLicht = new THREE.AmbientLight(0xffffff, 0.6); 
-    szene.add(umgebungsLicht);
+    // 8 Eckpunkte eines Würfels (Modell-Koordinaten)
+    const knoten = [
+        {x: -1, y: -1, z: -1}, {x: 1, y: -1, z: -1},
+        {x: 1, y: 1, z: -1},  {x: -1, y: 1, z: -1},
+        {x: -1, y: -1, z: 1},  {x: 1, y: -1, z: 1},
+        {x: 1, y: 1, z: 1},   {x: -1, y: 1, z: 1}
+    ];
 
-    const sonnenLicht = new THREE.DirectionalLight(0xffffff, 1.5);
-    szene.add(sonnenLicht);
+    // Die 6 Seitenflächen definiert durch die Eckpunkt-Indizes und deren Normalenvektoren
+    const flaechen = [
+        { punkte: [0, 1, 2, 3], normale: {x: 0, y: 0, z: -1} }, // Hinten
+        { punkte: [1, 5, 6, 2], normale: {x: 1, y: 0, z: 0} },  // Rechts
+        { punkte: [5, 4, 7, 6], normale: {x: 0, y: 0, z: 1} },  // Vorne
+        { punkte: [4, 0, 3, 7], normale: {x: -1, y: 0, z: 0} }, // Links
+        { punkte: [4, 5, 1, 0], normale: {x: 0, y: -1, z: 0} }, // Oben
+        { punkte: [3, 2, 6, 7], normale: {x: 0, y: 1, z: 0} }   // Unten
+    ];
 
-    // Funktion zur Berechnung des Lichtes
-    function berechneLicht(stunden) {
-        const winkel = (stunden / 24) * Math.PI * 2 - Math.PI / 2;
-        const radius = 5;
-        const x = Math.cos(winkel) * radius;
-        const y = Math.sin(winkel) * radius; 
-        const z = 4; 
-        sonnenLicht.position.set(x, y, z);
+    // --- Lichtberechnung ---
+    function aktualisiereLicht(stunden) {
+        // Sonnenposition berechnen (0-24 Uhr = 360 Grad im Kreis)
+        const sonnenWinkel = (stunden / 24) * Math.PI * 2 - Math.PI / 2;
+        
+        // Richtung, aus der das Licht kommt
+        lichtVektor.x = Math.cos(sonnenWinkel);
+        lichtVektor.y = -Math.sin(sonnenWinkel); // Invertiert für Canvas 2D Y-Achse
+        lichtVektor.z = 0.5; // Plastischer Vorne-Effekt
 
+        // Vektor normalisieren
+        const laenge = Math.sqrt(lichtVektor.x**2 + lichtVektor.y**2 + lichtVektor.z**2);
+        lichtVektor.x /= laenge;
+        lichtVektor.y /= laenge;
+        lichtVektor.z /= laenge;
+
+        // Farben je nach Tageszeit anpassen
         if (stunden >= 6 && stunden < 11) {
-            // Morgen
-            sonnenLicht.color.setHex(0xffb566);
-            sonnenLicht.intensity = 1.6;
-            umgebungsLicht.color.setHex(0xa0b0ff);
-            umgebungsLicht.intensity = 0.6;
+            lichtFarbe = { r: 255, g: 180, b: 100 }; // Morgen
         } else if (stunden >= 11 && stunden < 16) {
-            // Mittag
-            sonnenLicht.color.setHex(0xffffff);
-            sonnenLicht.intensity = 2.0;
-            umgebungsLicht.color.setHex(0xffffff);
-            umgebungsLicht.intensity = 0.7;
+            lichtFarbe = { r: 255, g: 255, b: 255 }; // Mittag
         } else if (stunden >= 16 && stunden < 21) {
-            // Abend
-            sonnenLicht.color.setHex(0xff6633);
-            sonnenLicht.intensity = 1.5;
-            umgebungsLicht.color.setHex(0x706080);
-            umgebungsLicht.intensity = 0.6;
+            lichtFarbe = { r: 255, g: 100, b: 50 };  // Abend
         } else {
-            // Nacht
-            sonnenLicht.color.setHex(0x5577ff);
-            sonnenLicht.intensity = 0.6; 
-            umgebungsLicht.color.setHex(0x223366);
-            umgebungsLicht.intensity = 0.5;
+            lichtFarbe = { r: 100, g: 120, b: 255 }; // Nacht
         }
     }
 
-    // --- Aktuelle Systemzeit auslesen und setzen ---
+    // --- Zeit initialisieren ---
     const jetzt = new Date();
     const aktuelleStunden = jetzt.getHours();
     const aktuelleMinuten = jetzt.getMinutes();
-    
-    // Setzt das Eingabefeld auf die aktuelle Uhrzeit
-    const formatiert = `${String(aktuelleStunden).padStart(2, '0')}:${String(aktuelleMinuten).padStart(2, '0')}`;
-    zeitRegler.value = formatiert;
+    zeitRegler.value = `${String(aktuelleStunden).padStart(2, '0')}:${String(aktuelleMinuten).padStart(2, '0')}`;
+    aktualisiereLicht(aktuelleStunden + aktuelleMinuten / 60);
 
-    // Führt die Lichtberechnung sofort aus
-    berechneLicht(aktuelleStunden + aktuelleMinuten / 60);
-
-    // Event Listener bei manueller Änderung
     zeitRegler.addEventListener('input', (e) => {
-        const zeitWert = e.target.value;
-        if (!zeitWert) return;
-
-        const [stundenStr, minutenStr] = zeitWert.split(':');
-        const dezimalStunden = parseInt(stundenStr, 10) + parseInt(minutenStr, 10) / 60;
-        
-        berechneLicht(dezimalStunden);
+        const parts = e.target.value.split(':');
+        if (parts.length === 2) {
+            aktualisiereLicht(parseInt(parts[0], 10) + parseInt(parts[1], 10) / 60);
+        }
     });
 
-    // --- Animationsschleife ---
-    function animieren() {
-        requestAnimationFrame(animieren);
-        wuerfel.rotation.x += 0.005;
-        wuerfel.rotation.y += 0.01;
-        renderer.render(szene, kamera);
-    }
-    animieren();
-
-    // Würfel gelb färben
     farbeButton.addEventListener('click', () => {
-        wuerfel.material.color.set('yellow');
+        wuerfelBasisFarbe = { r: 255, g: 235, b: 59 }; // Gelb
     });
 
-    // --- Drag-and-Drop ---
+    // --- 3D Rotation und Rendering ---
+    function rotiereX(punkt, winkel) {
+        const rad = winkel;
+        const cos = Math.cos(rad), sin = Math.sin(rad);
+        return { x: punkt.x, y: punkt.y * cos - punkt.z * sin, z: punkt.y * sin + punkt.z * cos };
+    }
+
+    function rotiereY(punkt, winkel) {
+        const rad = winkel;
+        const cos = Math.cos(rad), sin = Math.sin(rad);
+        return { x: punkt.x * cos + punkt.z * sin, y: punkt.y, z: -punkt.x * sin + punkt.z * cos };
+    }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. Alle Punkte rotieren
+        const rotierteKnoten = knoten.map(p => {
+            let r = rotiereX(p, winkelX);
+            return rotiereY(r, winkelY);
+        });
+
+        // 2. Flächen berechnen und Tiefensortierung (Painters Algorithm) vornehmen
+        const gerenderteFlaechen = flaechen.map(f => {
+            // Rotierte Normale für die Lichtberechnung bestimmen
+            let rNormale = rotiereX(f.normale, winkelX);
+            rNormale = rotiereY(rNormale, winkelY);
+
+            // Durchschnittliches Z der Fläche ermitteln (für Sortierung)
+            const zZentrum = (rotierteKnoten[f.punkte[0]].z + rotierteKnoten[f.punkte[1]].z + 
+                             rotierteKnoten[f.punkte[2]].z + rotierteKnoten[f.punkte[3]].z) / 4;
+
+            return { flaechenInfo: f, rNormale: rNormale, zZentrum: zZentrum };
+        });
+
+        // Sortieren, damit die hinteren Flächen zuerst gezeichnet werden
+        gerenderteFlaechen.sort((a, b) => b.zZentrum - a.zZentrum);
+
+        // 3. Flächen zeichnen
+        gerenderteFlaechen.forEach(f => {
+            // Nur zeichnen, wenn die Fläche nach vorne zeigt (Backface Culling)
+            if (f.rNormale.z < 0) return;
+
+            // Diffuses Licht berechnen (Skalarprodukt aus Normale und Lichtrichtungs-Vektor)
+            let punktProdukt = f.rNormale.x * lichtVektor.x + f.rNormale.y * lichtVektor.y + f.rNormale.z * lichtVektor.z;
+            let lichtIntensitaet = Math.max(0.15, punktProdukt); // Mindest-Grundhelligkeit von 0.15
+
+            // Mischen der Würfelfarbe mit der Lichtfarbe und Intensität
+            let r = Math.min(255, Math.floor((wuerfelBasisFarbe.r * 0.4 + lichtFarbe.r * 0.6) * lichtIntensitaet));
+            let g = Math.min(255, Math.floor((wuerfelBasisFarbe.g * 0.4 + lichtFarbe.g * 0.6) * lichtIntensitaet));
+            let b = Math.min(255, Math.floor((wuerfelBasisFarbe.b * 0.4 + lichtFarbe.b * 0.6) * lichtIntensitaet));
+
+            ctx.beginPath();
+            f.flaechenInfo.punkte.forEach((kIdx, i) => {
+                const k = rotierteKnoten[kIdx];
+                // Projektion von 3D auf 2D (Skalierung und Zentrierung im Canvas)
+                const x2d = canvas.width / 2 + k.x * 55;
+                const y2d = canvas.height / 2 + k.y * 55;
+
+                if (i === 0) ctx.moveTo(x2d, y2d);
+                else ctx.lineTo(x2d, y2d);
+            });
+            ctx.closePath();
+
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            ctx.fill();
+            ctx.strokeStyle = `rgba(0,0,0,0.15)`;
+            ctx.stroke();
+        });
+
+        // Winkel inkrementieren für kontinuierliche Drehung
+        winkelX += 0.005;
+        winkelY += 0.01;
+
+        requestAnimationFrame(render);
+    }
+
+    // Animation starten
+    render();
+
+    // --- Drag-and-Drop Logik (Unverändert) ---
     let verschiebbar = false;
     let istDragging = false;
     let startX, startY, startLeft, startTop;
