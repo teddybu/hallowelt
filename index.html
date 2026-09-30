@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>3D Box mit tagesaktuellem Licht (Pure Offline)</title>
+    <title>3D Box mit tagesaktuellem Licht (Garantierte Offline-Version)</title>
     <style>
         body {
             font-family: sans-serif;
@@ -58,6 +58,7 @@
 </div>
 
 <script>
+    // --- KEINE VERWENDUNG VON "THREE" MEHR ---
     const farbbox = document.getElementById('farbbox');
     const ziehenButton = document.getElementById('ziehen');
     const farbeButton = document.getElementById('farbe');
@@ -72,7 +73,7 @@
     let winkelX = 0.5;
     let winkelY = 0.5;
 
-    // Licht-Vektor (Standardmäßig initialisiert)
+    // Licht-Vektor und Licht-Farbe
     let lichtVektor = { x: 0, y: 1, z: 0 };
     let lichtFarbe = { r: 255, g: 255, b: 255 };
 
@@ -86,12 +87,12 @@
 
     // Die 6 Seitenflächen definiert durch die Eckpunkt-Indizes und deren Normalenvektoren
     const flaechen = [
-        { punkte: [0, 1, 2, 3], normale: {x: 0, y: 0, z: -1} }, // Hinten
-        { punkte: [1, 5, 6, 2], normale: {x: 1, y: 0, z: 0} },  // Rechts
-        { punkte: [5, 4, 7, 6], normale: {x: 0, y: 0, z: 1} },  // Vorne
-        { punkte: [4, 0, 3, 7], normale: {x: -1, y: 0, z: 0} }, // Links
-        { punkte: [4, 5, 1, 0], normale: {x: 0, y: -1, z: 0} }, // Oben
-        { punkte: [3, 2, 6, 7], normale: {x: 0, y: 1, z: 0} }   // Unten
+        { punkte:, normale: {x: 0, y: 0, z: -1} }, // Hinten
+        { punkte:, normale: {x: 1, y: 0, z: 0} },  // Rechts
+        { punkte:, normale: {x: 0, y: 0, z: 1} },  // Vorne
+        { punkte:, normale: {x: -1, y: 0, z: 0} }, // Links
+        { punkte:, normale: {x: 0, y: -1, z: 0} }, // Oben
+        { punkte:, normale: {x: 0, y: 1, z: 0} }   // Unten
     ];
 
     // --- Lichtberechnung ---
@@ -101,7 +102,7 @@
         
         // Richtung, aus der das Licht kommt
         lichtVektor.x = Math.cos(sonnenWinkel);
-        lichtVektor.y = -Math.sin(sonnenWinkel); // Invertiert für Canvas 2D Y-Achse
+        lichtVektor.y = -Math.sin(sonnenWinkel); 
         lichtVektor.z = 0.5; // Plastischer Vorne-Effekt
 
         // Vektor normalisieren
@@ -164,11 +165,9 @@
 
         // 2. Flächen berechnen und Tiefensortierung (Painters Algorithm) vornehmen
         const gerenderteFlaechen = flaechen.map(f => {
-            // Rotierte Normale für die Lichtberechnung bestimmen
             let rNormale = rotiereX(f.normale, winkelX);
             rNormale = rotiereY(rNormale, winkelY);
 
-            // Durchschnittliches Z der Fläche ermitteln (für Sortierung)
             const zZentrum = (rotierteKnoten[f.punkte[0]].z + rotierteKnoten[f.punkte[1]].z + 
                              rotierteKnoten[f.punkte[2]].z + rotierteKnoten[f.punkte[3]].z) / 4;
 
@@ -180,12 +179,11 @@
 
         // 3. Flächen zeichnen
         gerenderteFlaechen.forEach(f => {
-            // Nur zeichnen, wenn die Fläche nach vorne zeigt (Backface Culling)
             if (f.rNormale.z < 0) return;
 
-            // Diffuses Licht berechnen (Skalarprodukt aus Normale und Lichtrichtungs-Vektor)
+            // Diffuses Licht berechnen
             let punktProdukt = f.rNormale.x * lichtVektor.x + f.rNormale.y * lichtVektor.y + f.rNormale.z * lichtVektor.z;
-            let lichtIntensitaet = Math.max(0.15, punktProdukt); // Mindest-Grundhelligkeit von 0.15
+            let lichtIntensitaet = Math.max(0.2, punktProdukt); // Mindest-Grundhelligkeit angehoben
 
             // Mischen der Würfelfarbe mit der Lichtfarbe und Intensität
             let r = Math.min(255, Math.floor((wuerfelBasisFarbe.r * 0.4 + lichtFarbe.r * 0.6) * lichtIntensitaet));
@@ -195,7 +193,6 @@
             ctx.beginPath();
             f.flaechenInfo.punkte.forEach((kIdx, i) => {
                 const k = rotierteKnoten[kIdx];
-                // Projektion von 3D auf 2D (Skalierung und Zentrierung im Canvas)
                 const x2d = canvas.width / 2 + k.x * 55;
                 const y2d = canvas.height / 2 + k.y * 55;
 
@@ -210,17 +207,17 @@
             ctx.stroke();
         });
 
-        // Winkel inkrementieren für kontinuierliche Drehung
+        // Kontinuierliche Drehung
         winkelX += 0.005;
         winkelY += 0.01;
 
         requestAnimationFrame(render);
     }
 
-    // Animation starten
+    // Starten
     render();
 
-    // --- Drag-and-Drop Logik (Unverändert) ---
+    // --- Drag-and-Drop Logik ---
     let verschiebbar = false;
     let istDragging = false;
     let startX, startY, startLeft, startTop;
