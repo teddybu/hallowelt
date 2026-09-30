@@ -6,9 +6,44 @@
     <button id="farbe">mach mich gelb</button>
 
     <script>
-  document.getElementById("farbe").addEventListener("click", function () {
-    document.getElementById("farbbox").style.backgroundColor = "yellow";
+
+        <script>
+  const box = document.getElementById("farbbox");
+  const ziehenButton = document.getElementById("ziehen");
+
+  document.getElementById("farbe").addEventListener("click", () => {
+    box.style.backgroundColor = "yellow";
   });
+
+  let verschiebbar = false;
+  let x = 0, y = 0;
+  let startX, startY;
+
+  ziehenButton.addEventListener("click", () => {
+    verschiebbar = !verschiebbar;
+    ziehenButton.textContent = verschiebbar
+      ? "Verschieben ausschalten"
+      : "Farbbox verschiebbar machen";
+    box.style.cursor = verschiebbar ? "grab" : "default";
+    box.style.touchAction = verschiebbar ? "none" : "auto";
+  });
+
+  box.addEventListener("pointerdown", (event) => {
+    if (!verschiebbar) return;
+
+    startX = event.clientX - x;
+    startY = event.clientY - y;
+    box.setPointerCapture(event.pointerId);
+  });
+
+  box.addEventListener("pointermove", (event) => {
+    if (!verschiebbar || !box.hasPointerCapture(event.pointerId)) return;
+
+    x = event.clientX - startX;
+    y = event.clientY - startY;
+    box.style.transform = `translate(${x}px, ${y}px)`;
+  });
+        
 </script>
     
 </body>
